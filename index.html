@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Imkerjahr Planer</title>
+<style>
+  :root {
+    --bg: #fbf8f1; --card: #ffffff; --text: #2b2418; --muted: #75694f;
+    --accent: #d99a1e; --accent-soft: #fbecc8; --line: #eadfc6; --weekend: #fff4dc;
+    --done: #9b9078;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1b1812; --card: #25211a; --text: #f1e9d8; --muted: #b4a787;
+      --accent: #f0b43c; --accent-soft: #3d3220; --line: #3a3326; --weekend: #2f2819;
+      --done: #7d735e;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { padding: 24px 16px 8px; max-width: 900px; margin: 0 auto; }
+  h1 { margin: 0; font-size: 1.6rem; }
+  h1 span { color: var(--accent); }
+  .sub { color: var(--muted); margin: 4px 0 0; }
+  nav { max-width: 900px; margin: 12px auto 0; padding: 0 16px; display: flex; gap: 8px; flex-wrap: wrap; }
+  nav button { border: 1px solid var(--line); background: var(--card); color: var(--text);
+               padding: 6px 14px; border-radius: 999px; font: inherit; cursor: pointer; }
+  nav button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #2b2418; font-weight: 600; }
+  nav button:disabled { opacity: .45; cursor: default; }
+  main { max-width: 900px; margin: 0 auto; padding: 16px; }
+  .controls { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+              padding: 16px; display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
+  .controls label { display: flex; flex-direction: column; gap: 4px; font-size: .9rem; color: var(--muted); }
+  .controls input, .controls select { font: inherit; color: var(--text); background: var(--bg);
+              border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+  .actions { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; }
+  .actions button { font: inherit; border: 1px solid var(--line); background: var(--bg); color: var(--text);
+              border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+  .hint { grid-column: 1 / -1; margin: 0; font-size: .85rem; color: var(--muted); }
+  ol.tasks { list-style: none; padding: 0; margin: 16px 0 0; display: grid; gap: 8px; }
+  .task { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+          padding: 12px 14px; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; }
+  .task.weekend { background: var(--weekend); }
+  .task.anchor { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .task.done .title, .task.done .desc { color: var(--done); text-decoration: line-through; }
+  .when { grid-row: span 2; min-width: 7.5rem; }
+  .date { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .wd { color: var(--muted); font-size: .9rem; }
+  .day { display: inline-block; margin-top: 4px; font-size: .75rem; background: var(--accent-soft);
+         border-radius: 999px; padding: 1px 8px; font-variant-numeric: tabular-nums; }
+  .title { font-weight: 600; display: flex; gap: 8px; align-items: baseline; }
+  .title input { transform: translateY(2px); accent-color: var(--accent); }
+  .desc { color: var(--muted); font-size: .92rem; }
+  .today-badge { font-size: .7rem; background: var(--accent); color: #2b2418; border-radius: 4px; padding: 0 6px; }
+  footer { max-width: 900px; margin: 0 auto; padding: 8px 16px 32px; color: var(--muted); font-size: .8rem; }
+  @media (max-width: 560px) {
+    .controls { grid-template-columns: 1fr; }
+    .task { grid-template-columns: 1fr; }
+    .when { grid-row: auto; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+    .day { margin-top: 0; }
+  }
+  @media print {
+    nav, .actions, .hint, footer { display: none; }
+    body { background: #fff; color: #000; }
+    .task { break-inside: avoid; border-color: #bbb; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Imkerjahr <span>Planer</span></h1>
+  <p class="sub">Aufgaben im Bienenjahr mit Datum und Wochentag planen.</p>
+</header>
+<nav id="modules" aria-label="Bereiche"></nav>
+<main>
+  <section class="controls">
+    <label>Datum
+      <input type="date" id="date">
+    </label>
+    <label>Das Datum gilt für
+      <select id="anchor"></select>
+    </label>
+    <div class="actions">
+      <button type="button" id="ics">Kalenderdatei (.ics)</button>
+      <button type="button" id="print">Drucken</button>
+      <button type="button" id="reset">Häkchen zurücksetzen</button>
+    </div>
+    <p class="hint" id="hint"></p>
+  </section>
+  <ol class="tasks" id="tasks"></ol>
+</main>
+<footer>
+  Richtwerte für die Umlarvmethode mit ca. 1 Tag alten Larven. Witterung und Volksstärke können die Abläufe um einige Tage verschieben.
+</footer>
+
+<script>
+/* ---------- Daten: hier lassen sich weitere Bereiche ergänzen ---------- */
+const MODULES = [
+  {
+    id: "koeniginnenzucht",
+    name: "Königinnenzucht",
+    defaultAnchor: "umlarven",
+    hint: "Tag 0 ist das Umlarven. Wähle aus, für welchen Arbeitsschritt dein Datum gilt – alle anderen Termine werden daraus berechnet.",
+    tasks: [
+      { id: "entweiseln", day: -9, title: "Pflegevolk entweiseln",
+        desc: "Königin aus dem vorgesehenen Pflegevolk entnehmen (z. B. als Ableger). Das Volk soll stark sein und viele junge Ammenbienen haben." },
+      { id: "zuchtwabe", day: -4, title: "Zuchtwabe ins Zuchtvolk hängen",
+        desc: "Helle, leere Wabe in die Mitte des Zuchtvolks hängen, damit die Königin sie bestiftet. So sind die Larven am Umlarvtag ca. 1 Tag alt." },
+      { id: "anbrueten", day: -1, title: "Zuchtrahmen vorbereiten & Pflegevolk füttern",
+        desc: "Zuchtrahmen mit Weiselbechern zum Anputzen ins Pflegevolk hängen. Pflegevolk mit Futterteig oder Flüssigfutter (1:1) versorgen." },
+      { id: "umlarven", day: 0, title: "Umlarven",
+        desc: "Zuerst alle Nachschaffungszellen im Pflegevolk ausbrechen. Dann die jüngsten Larven aus der Zuchtwabe in die Weiselbecher übertragen und den Zuchtrahmen einhängen." },
+      { id: "annahme", day: 2, title: "Annahmekontrolle",
+        desc: "Nachsehen, wie viele Zellen angenommen und gepflegt werden (Futtersaft, verlängerte Zellen). Ergebnis notieren." },
+      { id: "verdeckelt", day: 5, title: "Weiselzellen verdeckelt",
+        desc: "Die Zellen sind nun verdeckelt. Kurz kontrollieren, aber den Zuchtrahmen nicht mehr unnötig bewegen oder schütteln. Erneut alle Nachschaffungszellen im Pflegevolk ausbrechen." },
+      { id: "begattung-vorb", day: 9, title: "Begattungseinheiten bilden",
+        desc: "Begattungsvölkchen bzw. Kunstschwärme bilden, damit sie am nächsten Tag weisellos sind und die Zelle annehmen." },
+      { id: "verschulen", day: 10, title: "Zellen verschulen / verteilen",
+        desc: "Reife Weiselzellen vorsichtig ausschneiden und in die Begattungseinheiten geben oder in Schlupfkäfige setzen. Letzter sicherer Tag!" },
+      { id: "schlupf", day: 12, title: "Schlupf der Königinnen",
+        desc: "Die Königinnen schlüpfen. Begattungseinheiten nicht stören." },
+      { id: "hochzeitsflug", day: 18, title: "Zeitraum Hochzeitsflüge",
+        desc: "Etwa 5–7 Tage nach dem Schlupf fliegen die Königinnen zur Begattung aus. Bei schönem Wetter auf Flugbetrieb achten, nicht öffnen." },
+      { id: "eilage", day: 24, title: "Kontrolle Eilage",
+        desc: "Nachsehen, ob die Königin begattet ist und Eier legt. Unbegattete oder verlorene Königinnen vermerken." },
+      { id: "brutbild", day: 30, title: "Brutbild prüfen & Königin zeichnen",
+        desc: "Geschlossenes Brutbild mit Arbeiterinnenbrut? Dann Königin zeichnen (Jahresfarbe) und ggf. Flügel beschneiden." },
+      { id: "verwenden", day: 35, title: "Königin verwenden",
+        desc: "Begattete Königin in ein Wirtschaftsvolk einweiseln oder die Begattungseinheit zum Jungvolk erweitern." }
+    ]
+  },
+  { id: "jahr", name: "Bienenjahr (bald)", disabled: true, tasks: [] }
+];
+
+/* ---------- Hilfsfunktionen ---------- */
+const WEEKDAYS = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+};
+const parseDate = s => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+const addDays = (date, n) => { const r = new Date(date); r.setDate(r.getDate() + n); return r; };
+const fmt = d => d.toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit", year: "numeric" });
+const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const sameDay = (a, b) => iso(a) === iso(b);
+const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+/* ---------- Zustand ---------- */
+let moduleId = store.get("modul", MODULES[0].id);
+const $ = id => document.getElementById(id);
+const current = () => MODULES.find(m => m.id === moduleId && !m.disabled) || MODULES[0];
+const stateKey = () => `plan:${current().id}`;
+const loadState = () => store.get(stateKey(), { date: iso(new Date()), anchor: current().defaultAnchor, done: {} });
+const saveState = s => store.set(stateKey(), s);
+
+function schedule(state) {
+  const m = current();
+  const anchor = m.tasks.find(t => t.id === state.anchor) || m.tasks.find(t => t.id === m.defaultAnchor);
+  const base = addDays(parseDate(state.date), -anchor.day);
+  return m.tasks.map(t => ({ ...t, date: addDays(base, t.day), isAnchor: t.id === anchor.id }));
+}
+
+/* ---------- Darstellung ---------- */
+function renderNav() {
+  $("modules").innerHTML = MODULES.map(m =>
+    `<button type="button" data-id="${m.id}" aria-pressed="${m.id === current().id}" ${m.disabled ? "disabled" : ""}>${esc(m.name)}</button>`
+  ).join("");
+}
+
+function renderControls() {
+  const m = current(), s = loadState();
+  $("anchor").innerHTML = m.tasks.map(t =>
+    `<option value="${t.id}">Tag ${t.day > 0 ? "+" : ""}${t.day}: ${esc(t.title)}</option>`).join("");
+  $("anchor").value = s.anchor;
+  $("date").value = s.date;
+  $("hint").textContent = m.hint || "";
+}
+
+function renderTasks() {
+  const s = loadState(), today = new Date();
+  $("tasks").innerHTML = schedule(s).map(t => {
+    const wd = t.date.getDay(), weekend = wd === 0 || wd === 6;
+    const cls = ["task", weekend && "weekend", t.isAnchor && "anchor", s.done[t.id] && "done"].filter(Boolean).join(" ");
+    return `<li class="${cls}">
+      <div class="when">
+        <div class="date">${fmt(t.date)}</div>
+        <div class="wd">${WEEKDAYS[wd]}</div>
+        <span class="day">Tag ${t.day > 0 ? "+" : ""}${t.day}</span>
+      </div>
+      <label class="title"><input type="checkbox" data-id="${t.id}" ${s.done[t.id] ? "checked" : ""}>
+        ${esc(t.title)} ${sameDay(t.date, today) ? '<span class="today-badge">heute</span>' : ""}</label>
+      <div class="desc">${esc(t.desc)}</div>
+    </li>`;
+  }).join("");
+}
+
+function renderAll() { renderNav(); renderControls(); renderTasks(); }
+
+/* ---------- Kalender-Export ---------- */
+function exportIcs() {
+  const m = current(), s = loadState();
+  const icsEsc = t => t.replace(/\\/g, "\\\\").replace(/[,;]/g, c => "\\" + c).replace(/\n/g, "\\n");
+  const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+/, "");
+  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Imkerjahr Planer//DE", "CALSCALE:GREGORIAN"];
+  schedule(s).forEach(t => {
+    lines.push("BEGIN:VEVENT",
+      `UID:${m.id}-${t.id}-${iso(t.date)}@imkerjahr-planer`,
+      `DTSTAMP:${stamp}`,
+      `DTSTART;VALUE=DATE:${iso(t.date).replace(/-/g, "")}`,
+      `DTEND;VALUE=DATE:${iso(addDays(t.date, 1)).replace(/-/g, "")}`,
+      `SUMMARY:${icsEsc(`${m.name}: ${t.title}`)}`,
+      `DESCRIPTION:${icsEsc(t.desc)}`,
+      "END:VEVENT");
+  });
+  lines.push("END:VCALENDAR");
+  const blob = new Blob([lines.join("\r\n")], { type: "text/calendar" });
+  const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: `${m.id}-${s.date}.ics` });
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+/* ---------- Ereignisse ---------- */
+$("modules").addEventListener("click", e => {
+  const b = e.target.closest("button[data-id]");
+  if (!b || b.disabled) return;
+  moduleId = b.dataset.id; store.set("modul", moduleId); renderAll();
+});
+$("date").addEventListener("change", e => {
+  if (!e.target.value) return;
+  const s = loadState(); s.date = e.target.value; saveState(s); renderTasks();
+});
+$("anchor").addEventListener("change", e => {
+  const s = loadState(); s.anchor = e.target.value; saveState(s); renderTasks();
+});
+$("tasks").addEventListener("change", e => {
+  if (!e.target.matches("input[type=checkbox]")) return;
+  const s = loadState(); s.done[e.target.dataset.id] = e.target.checked; saveState(s); renderTasks();
+});
+$("reset").addEventListener("click", () => { const s = loadState(); s.done = {}; saveState(s); renderTasks(); });
+$("print").addEventListener("click", () => window.print());
+$("ics").addEventListener("click", exportIcs);
+
+renderAll();
+</script>
+</body>
+</html>
