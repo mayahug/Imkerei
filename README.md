@@ -4,7 +4,13 @@ Kleine Web-App, um die Aufgaben im Imkerjahr zu planen. Einfach `index.html` im 
 
 ## Königinnenzucht
 
-Datum eingeben und auswählen, für welchen Arbeitsschritt es gilt (Standard: Umlarven = Tag 0).
+Zuchtmethode wählen:
+
+- **Pflegevolk (weiselrichtig)** – Königin bleibt im Volk, Pflege über dem Absperrgitter
+- **Anbrüter + Pflegevolk** – 24 h im weisellosen Anbrüter, danach ins Pflegevolk
+- **Königin aus Volk entfernt** – Pflegevolk 9 Tage vorher entweiselt
+
+Dann Datum eingeben und auswählen, für welchen Arbeitsschritt es gilt (Standard: Umlarven = Tag 0).
 Die App berechnet für jede Aufgabe Datum und Wochentag.
 
 - Wochenenden sind farblich markiert, der heutige Termin bekommt ein «heute»-Abzeichen.

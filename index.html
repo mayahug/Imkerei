@@ -38,6 +38,8 @@
   .actions { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; }
   .actions button { font: inherit; border: 1px solid var(--line); background: var(--bg); color: var(--text);
               border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+  .controls .wide { grid-column: 1 / -1; }
+  .hint:empty { display: none; }
   .hint { grid-column: 1 / -1; margin: 0; font-size: .85rem; color: var(--muted); }
   ol.tasks { list-style: none; padding: 0; margin: 16px 0 0; display: grid; gap: 8px; }
   .task { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
@@ -76,6 +78,10 @@
 <nav id="modules" aria-label="Bereiche"></nav>
 <main>
   <section class="controls">
+    <label class="wide">Zuchtmethode
+      <select id="method"></select>
+    </label>
+    <p class="hint" id="method-info"></p>
     <label>Datum
       <input type="date" id="date">
     </label>
@@ -92,47 +98,99 @@
   <ol class="tasks" id="tasks"></ol>
 </main>
 <footer>
-  Richtwerte für die Umlarvmethode mit ca. 1 Tag alten Larven. Witterung und Volksstärke können die Abläufe um einige Tage verschieben.
+  Richtwerte für das Umlarven von ca. 1 Tag alten Larven. Witterung und Volksstärke können die Abläufe um einige Tage verschieben.
 </footer>
 
 <script>
 /* ---------- Daten: hier lassen sich weitere Bereiche ergänzen ---------- */
+// Gemeinsame Schritte ab der Annahmekontrolle (gleich für alle Methoden)
+const ZUCHT_GEMEINSAM = [
+  { id: "begattung-vorb", day: 9, title: "Begattungseinheiten bilden",
+    desc: "Begattungsvölkchen bzw. Kunstschwärme bilden, damit sie am nächsten Tag weisellos sind und die Zelle annehmen." },
+  { id: "verschulen", day: 10, title: "Zellen verschulen / verteilen",
+    desc: "Reife Weiselzellen vorsichtig ausschneiden und in die Begattungseinheiten geben oder in Schlupfkäfige setzen. Letzter sicherer Tag!" },
+  { id: "schlupf", day: 12, title: "Schlupf der Königinnen",
+    desc: "Die Königinnen schlüpfen. Begattungseinheiten nicht stören." },
+  { id: "hochzeitsflug", day: 18, title: "Zeitraum Hochzeitsflüge",
+    desc: "Etwa 5–7 Tage nach dem Schlupf fliegen die Königinnen zur Begattung aus. Bei schönem Wetter auf Flugbetrieb achten, nicht öffnen." },
+  { id: "eilage", day: 24, title: "Kontrolle Eilage",
+    desc: "Nachsehen, ob die Königin begattet ist und Eier legt. Unbegattete oder verlorene Königinnen vermerken." },
+  { id: "brutbild", day: 30, title: "Brutbild prüfen & Königin zeichnen",
+    desc: "Geschlossenes Brutbild mit Arbeiterinnenbrut? Dann Königin zeichnen (Jahresfarbe) und ggf. Flügel beschneiden." },
+  { id: "verwenden", day: 35, title: "Königin verwenden",
+    desc: "Begattete Königin in ein Wirtschaftsvolk einweiseln oder die Begattungseinheit zum Jungvolk erweitern." }
+];
+const ZUCHTWABE = { id: "zuchtwabe", day: -4, title: "Zuchtwabe ins Zuchtvolk hängen",
+  desc: "Helle, leere Wabe in die Mitte des Zuchtvolks hängen, damit die Königin sie bestiftet. So sind die Larven am Umlarvtag ca. 1 Tag alt." };
+const ANNAHME = { id: "annahme", day: 2, title: "Annahmekontrolle",
+  desc: "Nachsehen, wie viele Zellen angenommen und gepflegt werden (Futtersaft, verlängerte Zellen). Ergebnis notieren." };
+
 const MODULES = [
   {
     id: "koeniginnenzucht",
     name: "Königinnenzucht",
     defaultAnchor: "umlarven",
-    hint: "Tag 0 ist das Umlarven. Wähle aus, für welchen Arbeitsschritt dein Datum gilt – alle anderen Termine werden daraus berechnet.",
-    tasks: [
-      { id: "entweiseln", day: -9, title: "Pflegevolk entweiseln",
-        desc: "Königin aus dem vorgesehenen Pflegevolk entnehmen (z. B. als Ableger). Das Volk soll stark sein und viele junge Ammenbienen haben." },
-      { id: "zuchtwabe", day: -4, title: "Zuchtwabe ins Zuchtvolk hängen",
-        desc: "Helle, leere Wabe in die Mitte des Zuchtvolks hängen, damit die Königin sie bestiftet. So sind die Larven am Umlarvtag ca. 1 Tag alt." },
-      { id: "anbrueten", day: -1, title: "Zuchtrahmen vorbereiten & Pflegevolk füttern",
-        desc: "Zuchtrahmen mit Weiselbechern zum Anputzen ins Pflegevolk hängen. Pflegevolk mit Futterteig oder Flüssigfutter (1:1) versorgen." },
-      { id: "umlarven", day: 0, title: "Umlarven",
-        desc: "Zuerst alle Nachschaffungszellen im Pflegevolk ausbrechen. Dann die jüngsten Larven aus der Zuchtwabe in die Weiselbecher übertragen und den Zuchtrahmen einhängen." },
-      { id: "annahme", day: 2, title: "Annahmekontrolle",
-        desc: "Nachsehen, wie viele Zellen angenommen und gepflegt werden (Futtersaft, verlängerte Zellen). Ergebnis notieren." },
-      { id: "verdeckelt", day: 5, title: "Weiselzellen verdeckelt",
-        desc: "Die Zellen sind nun verdeckelt. Kurz kontrollieren, aber den Zuchtrahmen nicht mehr unnötig bewegen oder schütteln. Erneut alle Nachschaffungszellen im Pflegevolk ausbrechen." },
-      { id: "begattung-vorb", day: 9, title: "Begattungseinheiten bilden",
-        desc: "Begattungsvölkchen bzw. Kunstschwärme bilden, damit sie am nächsten Tag weisellos sind und die Zelle annehmen." },
-      { id: "verschulen", day: 10, title: "Zellen verschulen / verteilen",
-        desc: "Reife Weiselzellen vorsichtig ausschneiden und in die Begattungseinheiten geben oder in Schlupfkäfige setzen. Letzter sicherer Tag!" },
-      { id: "schlupf", day: 12, title: "Schlupf der Königinnen",
-        desc: "Die Königinnen schlüpfen. Begattungseinheiten nicht stören." },
-      { id: "hochzeitsflug", day: 18, title: "Zeitraum Hochzeitsflüge",
-        desc: "Etwa 5–7 Tage nach dem Schlupf fliegen die Königinnen zur Begattung aus. Bei schönem Wetter auf Flugbetrieb achten, nicht öffnen." },
-      { id: "eilage", day: 24, title: "Kontrolle Eilage",
-        desc: "Nachsehen, ob die Königin begattet ist und Eier legt. Unbegattete oder verlorene Königinnen vermerken." },
-      { id: "brutbild", day: 30, title: "Brutbild prüfen & Königin zeichnen",
-        desc: "Geschlossenes Brutbild mit Arbeiterinnenbrut? Dann Königin zeichnen (Jahresfarbe) und ggf. Flügel beschneiden." },
-      { id: "verwenden", day: 35, title: "Königin verwenden",
-        desc: "Begattete Königin in ein Wirtschaftsvolk einweiseln oder die Begattungseinheit zum Jungvolk erweitern." }
+    hint: "Tag 0 ist das Umlarven. Wähle die Zuchtmethode und für welchen Arbeitsschritt dein Datum gilt – alle anderen Termine werden daraus berechnet.",
+    methods: [
+      {
+        id: "pflegevolk",
+        name: "Pflegevolk (weiselrichtig)",
+        info: "Die Königin bleibt im Volk. Gepflegt wird im Honigraum über dem Absperrgitter, wohin offene Brut hochgehängt wird.",
+        tasks: [
+          { id: "brut-hoch", day: -7, title: "Offene Brut über das Absperrgitter hängen",
+            desc: "Im Pflegevolk 1–2 Waben mit offener Brut in den Honigraum über das Absperrgitter hängen. Die Ammenbienen ziehen nach oben. Königin bleibt unten im Brutraum." },
+          ZUCHTWABE,
+          { id: "anbrueten", day: -1, title: "Zuchtrahmen vorbereiten & Pflegevolk füttern",
+            desc: "Zuchtrahmen mit Weiselbechern zum Anputzen zwischen die hochgehängten Brutwaben hängen. Pflegevolk füttern (Futterteig oder Flüssigfutter 1:1)." },
+          { id: "umlarven", day: 0, title: "Umlarven",
+            desc: "Auf den hochgehängten Brutwaben alle Nachschaffungszellen ausbrechen. Dann die jüngsten Larven in die Weiselbecher übertragen und den Zuchtrahmen zwischen die Brutwaben im Honigraum hängen." },
+          ANNAHME,
+          { id: "verdeckelt", day: 5, title: "Weiselzellen verdeckelt",
+            desc: "Die Zellen sind verdeckelt. Auf den hochgehängten Brutwaben nochmals Nachschaffungszellen ausbrechen. Zuchtrahmen nicht schütteln." },
+          ...ZUCHT_GEMEINSAM
+        ]
+      },
+      {
+        id: "anbrueter",
+        name: "Anbrüter + Pflegevolk",
+        info: "Die Larven werden 24 Stunden in einem weisellosen, brutfreien Anbrüter (Starter) angepflegt und danach in einem weiselrichtigen Pflegevolk (Finisher) fertig gepflegt.",
+        tasks: [
+          ZUCHTWABE,
+          { id: "pflege-vorb", day: -1, title: "Pflegevolk & Anbrüterkiste vorbereiten",
+            desc: "Im späteren Pflegevolk offene Brut über das Absperrgitter hängen. Anbrüterkiste mit Futter- und Pollenwabe sowie Wassergabe bereitstellen." },
+          { id: "anbrueter-bilden", day: 0, title: "Anbrüter bilden (morgens)",
+            desc: "2–3 Stunden vor dem Umlarven reichlich junge Bienen (ca. 1–1,5 kg) ohne Königin in die Anbrüterkiste fegen und kühl und dunkel stellen." },
+          { id: "umlarven", day: 0, title: "Umlarven",
+            desc: "Jüngste Larven in die Weiselbecher übertragen und den Zuchtrahmen in den Anbrüter geben." },
+          { id: "umhaengen", day: 1, title: "Zuchtrahmen ins Pflegevolk umhängen",
+            desc: "Nach ca. 24 Stunden die angepflegten Zellen ins weiselrichtige Pflegevolk über das Absperrgitter hängen. Zuvor dort Nachschaffungszellen ausbrechen. Anbrüterbienen zurück ins Volk geben." },
+          ANNAHME,
+          { id: "verdeckelt", day: 5, title: "Weiselzellen verdeckelt",
+            desc: "Die Zellen sind verdeckelt. Im Honigraum nochmals Nachschaffungszellen ausbrechen. Zuchtrahmen nicht schütteln." },
+          ...ZUCHT_GEMEINSAM
+        ]
+      },
+      {
+        id: "weisellos",
+        name: "Königin aus Volk entfernt",
+        info: "Dem Pflegevolk wird 9 Tage vorher die Königin entnommen. Am Umlarvtag gibt es keine jungen Larven mehr, und alle Nachschaffungszellen werden ausgebrochen.",
+        tasks: [
+          { id: "entweiseln", day: -9, title: "Pflegevolk entweiseln",
+            desc: "Königin aus dem vorgesehenen Pflegevolk entnehmen (z. B. als Ableger). Das Volk soll stark sein und viele junge Ammenbienen haben." },
+          ZUCHTWABE,
+          { id: "anbrueten", day: -1, title: "Zuchtrahmen vorbereiten & Pflegevolk füttern",
+            desc: "Zuchtrahmen mit Weiselbechern zum Anputzen ins Pflegevolk hängen. Pflegevolk füttern (Futterteig oder Flüssigfutter 1:1)." },
+          { id: "umlarven", day: 0, title: "Umlarven",
+            desc: "Zuerst alle Nachschaffungszellen im Pflegevolk restlos ausbrechen. Dann die jüngsten Larven in die Weiselbecher übertragen und den Zuchtrahmen einhängen." },
+          ANNAHME,
+          { id: "verdeckelt", day: 5, title: "Weiselzellen verdeckelt",
+            desc: "Die Zellen sind verdeckelt. Kurz kontrollieren, Zuchtrahmen nicht schütteln. Übersehene Nachschaffungszellen im Pflegevolk ausbrechen." },
+          ...ZUCHT_GEMEINSAM
+        ]
+      }
     ]
   },
-  { id: "jahr", name: "Bienenjahr (bald)", disabled: true, tasks: [] }
+  { id: "jahr", name: "Bienenjahr (bald)", disabled: true, methods: [] }
 ];
 
 /* ---------- Hilfsfunktionen ---------- */
@@ -153,14 +211,18 @@ let moduleId = store.get("modul", MODULES[0].id);
 const $ = id => document.getElementById(id);
 const current = () => MODULES.find(m => m.id === moduleId && !m.disabled) || MODULES[0];
 const stateKey = () => `plan:${current().id}`;
-const loadState = () => store.get(stateKey(), { date: iso(new Date()), anchor: current().defaultAnchor, done: {} });
+const loadState = () => {
+  const s = store.get(stateKey(), {});
+  return { date: iso(new Date()), anchor: current().defaultAnchor, method: current().methods[0].id, done: {}, ...s };
+};
+const currentMethod = s => current().methods.find(x => x.id === s.method) || current().methods[0];
 const saveState = s => store.set(stateKey(), s);
 
 function schedule(state) {
-  const m = current();
-  const anchor = m.tasks.find(t => t.id === state.anchor) || m.tasks.find(t => t.id === m.defaultAnchor);
+  const m = current(), tasks = currentMethod(state).tasks;
+  const anchor = tasks.find(t => t.id === state.anchor) || tasks.find(t => t.id === m.defaultAnchor);
   const base = addDays(parseDate(state.date), -anchor.day);
-  return m.tasks.map(t => ({ ...t, date: addDays(base, t.day), isAnchor: t.id === anchor.id }));
+  return tasks.map(t => ({ ...t, date: addDays(base, t.day), isAnchor: t.id === anchor.id }));
 }
 
 /* ---------- Darstellung ---------- */
@@ -172,9 +234,13 @@ function renderNav() {
 
 function renderControls() {
   const m = current(), s = loadState();
-  $("anchor").innerHTML = m.tasks.map(t =>
+  const method = currentMethod(s);
+  $("method").innerHTML = m.methods.map(x => `<option value="${x.id}">${esc(x.name)}</option>`).join("");
+  $("method").value = method.id;
+  $("method-info").textContent = method.info || "";
+  $("anchor").innerHTML = method.tasks.map(t =>
     `<option value="${t.id}">Tag ${t.day > 0 ? "+" : ""}${t.day}: ${esc(t.title)}</option>`).join("");
-  $("anchor").value = s.anchor;
+  $("anchor").value = method.tasks.some(t => t.id === s.anchor) ? s.anchor : m.defaultAnchor;
   $("date").value = s.date;
   $("hint").textContent = m.hint || "";
 }
@@ -230,6 +296,14 @@ $("modules").addEventListener("click", e => {
 $("date").addEventListener("change", e => {
   if (!e.target.value) return;
   const s = loadState(); s.date = e.target.value; saveState(s); renderTasks();
+});
+$("method").addEventListener("change", e => {
+  const s = loadState();
+  // Umlarvtag beibehalten, falls der gewählte Bezugsschritt in der neuen Methode fehlt
+  const umlarvDatum = schedule(s).find(t => t.id === current().defaultAnchor).date;
+  s.method = e.target.value; s.done = {};
+  if (!currentMethod(s).tasks.some(t => t.id === s.anchor)) { s.anchor = current().defaultAnchor; s.date = iso(umlarvDatum); }
+  saveState(s); renderControls(); renderTasks();
 });
 $("anchor").addEventListener("change", e => {
   const s = loadState(); s.anchor = e.target.value; saveState(s); renderTasks();
