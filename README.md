@@ -6,7 +6,7 @@ Kleine Web-App, um die Aufgaben im Imkerjahr zu planen. Einfach `index.html` im 
 
 Zuchtmethode wählen:
 
-- **Pflegevolk (weiselrichtig)** – Königin bleibt im Volk, Pflege über dem Absperrgitter
+- **Pflegevolk** – Königin wird ca. 2 h vor dem Umlarven entnommen, dann Zuchtrahmen einsetzen
 - **Anbrüter + Pflegevolk** – 24 h im weisellosen Anbrüter, danach ins Pflegevolk
 - **Königin aus Volk entfernt** – Pflegevolk 9 Tage vorher entweiselt
 

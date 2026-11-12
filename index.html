@@ -134,19 +134,19 @@ const MODULES = [
     methods: [
       {
         id: "pflegevolk",
-        name: "Pflegevolk (weiselrichtig)",
-        info: "Die Königin bleibt im Volk. Gepflegt wird im Honigraum über dem Absperrgitter, wohin offene Brut hochgehängt wird.",
+        name: "Pflegevolk",
+        info: "Dem Pflegevolk wird ca. 2 Stunden vor dem Umlarven die Königin entnommen, danach kommt der Zuchtrahmen hinein. Was das Volk auf den eigenen Waben nachzieht, kann man ausbrechen oder schlüpfen lassen.",
         tasks: [
-          { id: "brut-hoch", day: -7, title: "Offene Brut über das Absperrgitter hängen",
-            desc: "Im Pflegevolk 1–2 Waben mit offener Brut in den Honigraum über das Absperrgitter hängen. Die Ammenbienen ziehen nach oben. Königin bleibt unten im Brutraum." },
           ZUCHTWABE,
           { id: "anbrueten", day: -1, title: "Zuchtrahmen vorbereiten & Pflegevolk füttern",
-            desc: "Zuchtrahmen mit Weiselbechern zum Anputzen zwischen die hochgehängten Brutwaben hängen. Pflegevolk füttern (Futterteig oder Flüssigfutter 1:1)." },
-          { id: "umlarven", day: 0, title: "Umlarven",
-            desc: "Auf den hochgehängten Brutwaben alle Nachschaffungszellen ausbrechen. Dann die jüngsten Larven in die Weiselbecher übertragen und den Zuchtrahmen zwischen die Brutwaben im Honigraum hängen." },
+            desc: "Zuchtrahmen mit Weiselbechern bereitmachen. Pflegevolk füttern (Futterteig oder Flüssigfutter 1:1), damit es in Pflegestimmung kommt." },
+          { id: "koenigin-raus", day: 0, title: "Königin aus dem Pflegevolk entnehmen",
+            desc: "Ca. 2 Stunden vor dem Umlarven die Königin aus dem Pflegevolk nehmen (z. B. in einen Ableger oder Käfig). So spürt das Volk die Weisellosigkeit, wenn der Zuchtrahmen kommt." },
+          { id: "umlarven", day: 0, title: "Umlarven & Zuchtrahmen einsetzen",
+            desc: "Jüngste Larven in die Weiselbecher übertragen und den Zuchtrahmen ins Pflegevolk hängen, zwischen Waben mit offener Brut." },
           ANNAHME,
-          { id: "verdeckelt", day: 5, title: "Weiselzellen verdeckelt",
-            desc: "Die Zellen sind verdeckelt. Auf den hochgehängten Brutwaben nochmals Nachschaffungszellen ausbrechen. Zuchtrahmen nicht schütteln." },
+          { id: "verdeckelt", day: 5, title: "Weiselzellen verdeckelt – eigene Nachschaffungszellen?",
+            desc: "Die Zellen sind verdeckelt, Zuchtrahmen nicht schütteln. Die Nachschaffungszellen, die das Volk auf den eigenen Waben angelegt hat, kann man ausbrechen oder schlüpfen lassen, ganz wie man will. Lässt man sie stehen: Sie können aus älteren Larven stammen und früher schlüpfen. Darum den Zuchtrahmen spätestens an Tag 9–10 entnehmen." },
           ...ZUCHT_GEMEINSAM
         ]
       },
