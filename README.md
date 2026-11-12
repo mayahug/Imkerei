@@ -10,8 +10,12 @@ Zuchtmethode wählen:
 - **Anbrüter + Pflegevolk** – 24 h im weisellosen Anbrüter, danach ins Pflegevolk
 - **Königin aus Volk entfernt** – Pflegevolk 9 Tage vorher entweiselt
 
-Dann Datum eingeben und auswählen, für welchen Arbeitsschritt es gilt (Standard: Umlarven = Tag 0).
-Die App berechnet für jede Aufgabe Datum und Wochentag.
+Dann optional das **Datum der Auffuhr auf die Belegstelle** eingeben:
+
+- **Ohne Belegstellendatum** startet der Plan heute (oder an einem gewählten Starttag). Die App zeigt, wann die Auffuhr frühestens und spätestens möglich ist.
+- **Mit Belegstellendatum** zeigt die App den frühesten und spätesten Starttag mit Wochentag. Du wählst aus, wann du tatsächlich startest. Vergangene Tage sind gesperrt.
+
+Die Auffuhr ist von Tag +13 (nach 3 Tagen Kellerhaft) bis Tag +16 nach dem Umlarven möglich (`AUFFUHR_FRUEH` / `AUFFUHR_SPAET` in `index.html`).
 
 - Wochenenden sind farblich markiert, der heutige Termin bekommt ein «heute»-Abzeichen.
 - Erledigte Aufgaben abhaken (wird im Browser gespeichert).

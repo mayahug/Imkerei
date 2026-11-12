@@ -23,6 +23,7 @@
       --done: #7d735e;
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   body { margin: 0; background: var(--bg); color: var(--text);
          font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
   header { padding: 24px 16px 8px; max-width: 900px; margin: 0 auto; }
@@ -43,6 +44,22 @@
   .actions { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; }
   .actions button { font: inherit; border: 1px solid var(--line); background: var(--bg); color: var(--text);
               border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+  .controls small { font-size: .8em; }
+  .window:empty { display: none; }
+  .window { background: var(--accent-soft); border-radius: 10px; padding: 12px; }
+  .window h2 { margin: 0 0 4px; font-size: 1rem; }
+  .window p { margin: 0 0 8px; font-size: .9rem; color: var(--muted); }
+  .window p.warn { color: var(--text); font-weight: 600; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .controls .chip { color: var(--text); flex-direction: column; gap: 0; }
+  .chip { position: relative; display: flex; flex-direction: column; align-items: flex-start; border: 1px solid var(--line);
+          background: var(--card); border-radius: 10px; padding: 6px 12px; cursor: pointer; font-size: .9rem; }
+  .chip input { position: absolute; opacity: 0; pointer-events: none; }
+  .chip:has(input:checked) { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+  .chip:has(input:disabled) { opacity: .45; cursor: not-allowed; }
+  .chip:has(input:focus-visible) { outline: 2px solid var(--text); outline-offset: 2px; }
+  .chip .lbl { font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  .chip b { font-variant-numeric: tabular-nums; }
   .controls .wide { grid-column: 1 / -1; }
   .hint:empty { display: none; }
   .hint { grid-column: 1 / -1; margin: 0; font-size: .85rem; color: var(--muted); }
@@ -87,12 +104,13 @@
       <select id="method"></select>
     </label>
     <p class="hint" id="method-info"></p>
-    <label>Datum
-      <input type="date" id="date">
+    <label>Auffuhr auf die Belegstelle <small>(optional)</small>
+      <input type="date" id="beleg">
     </label>
-    <label>Das Datum gilt für
-      <select id="anchor"></select>
+    <label id="start-wrap">Start <small>(leer = heute)</small>
+      <input type="date" id="start">
     </label>
+    <div class="window wide" id="window"></div>
     <div class="actions">
       <button type="button" id="ics">Kalenderdatei (.ics)</button>
       <button type="button" id="print">Drucken</button>
@@ -108,12 +126,18 @@
 
 <script>
 /* ---------- Daten: hier lassen sich weitere Bereiche ergänzen ---------- */
+// Auffuhr auf die Belegstelle, in Tagen nach dem Umlarven:
+// frühestens nach der Kellerhaft (Königin ca. 1 Tag alt), spätestens bevor die Hochzeitsflüge beginnen.
+const AUFFUHR_FRUEH = 13;
+const AUFFUHR_SPAET = 16;
+const AUFFUHR_DESC = "Begattungseinheiten nach der Kellerhaft auf die Belegstelle bringen. Die jungen Königinnen müssen dort sein, bevor sie zum Hochzeitsflug ausfliegen.";
+
 // Gemeinsame Schritte ab der Annahmekontrolle (gleich für alle Methoden)
 const ZUCHT_GEMEINSAM = [
   { id: "begattung-vorb", day: 9, title: "Begattungseinheiten bilden",
     desc: "Begattungsvölkchen bzw. Kunstschwärme bilden, damit sie am nächsten Tag weisellos sind und die Zelle annehmen." },
   { id: "verschulen", day: 10, title: "Zellen verschulen / verteilen",
-    desc: "Reife Weiselzellen vorsichtig ausschneiden und in die Begattungseinheiten geben oder in Schlupfkäfige setzen. Letzter sicherer Tag!" },
+    desc: "Reife Weiselzellen vorsichtig ausschneiden und in die Begattungseinheiten (z. B. EWK) geben. Danach ca. 3 Tage kühl und dunkel in Kellerhaft stellen. Letzter sicherer Tag!" },
   { id: "schlupf", day: 12, title: "Schlupf der Königinnen",
     desc: "Die Königinnen schlüpfen. Begattungseinheiten nicht stören." },
   { id: "hochzeitsflug", day: 18, title: "Zeitraum Hochzeitsflüge",
@@ -134,8 +158,7 @@ const MODULES = [
   {
     id: "koeniginnenzucht",
     name: "Königinnenzucht",
-    defaultAnchor: "umlarven",
-    hint: "Tag 0 ist das Umlarven. Wähle die Zuchtmethode und für welchen Arbeitsschritt dein Datum gilt – alle anderen Termine werden daraus berechnet.",
+    hint: "Tag 0 ist das Umlarven. Ohne Belegstellendatum startet der Plan heute (oder am gewählten Starttag). Mit Belegstellendatum wählst du den Starttag aus den möglichen Terminen.",
     methods: [
       {
         id: "pflegevolk",
@@ -218,19 +241,50 @@ const current = () => MODULES.find(m => m.id === moduleId && !m.disabled) || MOD
 const stateKey = () => `plan:${current().id}`;
 const loadState = () => {
   const s = store.get(stateKey(), {});
-  return { date: iso(new Date()), anchor: current().defaultAnchor, method: current().methods[0].id, done: {}, ...s };
+  return { method: current().methods[0].id, beleg: "", start: "", done: {}, ...s };
 };
-const currentMethod = s => current().methods.find(x => x.id === s.method) || current().methods[0];
 const saveState = s => store.set(stateKey(), s);
+const currentMethod = s => current().methods.find(x => x.id === s.method) || current().methods[0];
+const today = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
+const firstDay = method => Math.min(...method.tasks.map(t => t.day));
+const sign = n => (n > 0 ? "+" : "") + n;
 
-function schedule(state) {
-  const m = current(), tasks = currentMethod(state).tasks;
-  const anchor = tasks.find(t => t.id === state.anchor) || tasks.find(t => t.id === m.defaultAnchor);
-  const base = addDays(parseDate(state.date), -anchor.day);
-  return tasks.map(t => ({ ...t, date: addDays(base, t.day), isAnchor: t.id === anchor.id }));
+// Mögliche Starttermine (= erste Aufgabe), damit die Auffuhr zum Belegstellendatum passt
+function startOptions(s) {
+  if (!s.beleg) return [];
+  const beleg = parseDate(s.beleg), f = firstDay(currentMethod(s)), t0 = today();
+  const opts = [];
+  for (let k = AUFFUHR_SPAET; k >= AUFFUHR_FRUEH; k--) {
+    const date = addDays(beleg, f - k);
+    opts.push({ date, past: date < t0, queenAge: k - 12 });
+  }
+  return opts;
 }
 
-/* ---------- Darstellung ---------- */
+// Gewählter Starttag
+function startDate(s) {
+  if (s.beleg) {
+    const opts = startOptions(s);
+    const chosen = opts.find(o => iso(o.date) === s.start && !o.past);
+    return (chosen || opts.find(o => !o.past) || opts[opts.length - 1]).date;
+  }
+  return s.start ? parseDate(s.start) : today();
+}
+
+function schedule(s) {
+  const method = currentMethod(s);
+  const umlarven = addDays(startDate(s), -firstDay(method));
+  const auffuhrDay = s.beleg ? Math.round((parseDate(s.beleg) - umlarven) / 864e5) : AUFFUHR_FRUEH;
+  const tasks = [...method.tasks, {
+    id: "auffuhr", day: auffuhrDay,
+    title: s.beleg ? "Auffuhr auf die Belegstelle" : "Auffuhr auf die Belegstelle (frühestens)",
+    desc: s.beleg ? AUFFUHR_DESC : `${AUFFUHR_DESC} Möglich von Tag +${AUFFUHR_FRUEH} bis Tag +${AUFFUHR_SPAET}.`
+  }].sort((x, y) => x.day - y.day);
+  return tasks.map(t => ({ ...t, date: addDays(umlarven, t.day), isAnchor: t.id === "auffuhr" && !!s.beleg }));
+}
+
+const dateWd = d => `${WEEKDAYS[d.getDay()].slice(0, 2)}, ${fmt(d)}`;
+
 function renderNav() {
   $("modules").innerHTML = MODULES.map(m =>
     `<button type="button" data-id="${m.id}" aria-pressed="${m.id === current().id}" ${m.disabled ? "disabled" : ""}>${esc(m.name)}</button>`
@@ -238,20 +292,43 @@ function renderNav() {
 }
 
 function renderControls() {
-  const m = current(), s = loadState();
-  const method = currentMethod(s);
+  const m = current(), s = loadState(), method = currentMethod(s);
   $("method").innerHTML = m.methods.map(x => `<option value="${x.id}">${esc(x.name)}</option>`).join("");
   $("method").value = method.id;
   $("method-info").textContent = method.info || "";
-  $("anchor").innerHTML = method.tasks.map(t =>
-    `<option value="${t.id}">Tag ${t.day > 0 ? "+" : ""}${t.day}: ${esc(t.title)}</option>`).join("");
-  $("anchor").value = method.tasks.some(t => t.id === s.anchor) ? s.anchor : m.defaultAnchor;
-  $("date").value = s.date;
+  $("beleg").value = s.beleg;
+  $("start-wrap").hidden = !!s.beleg;
+  $("start").value = s.beleg ? "" : s.start;
   $("hint").textContent = m.hint || "";
+  renderWindow();
+}
+
+function renderWindow() {
+  const s = loadState();
+  if (!s.beleg) {
+    const umlarven = addDays(startDate(s), -firstDay(currentMethod(s)));
+    $("window").innerHTML = `<h2>Auffuhr auf die Belegstelle möglich</h2>
+      <p>frühestens <b>${dateWd(addDays(umlarven, AUFFUHR_FRUEH))}</b> · spätestens <b>${dateWd(addDays(umlarven, AUFFUHR_SPAET))}</b></p>`;
+    return;
+  }
+  const opts = startOptions(s), sel = iso(startDate(s));
+  const method = currentMethod(s), firstTask = method.tasks.find(t => t.day === firstDay(method));
+  const allPast = opts.every(o => o.past);
+  const first = opts[0].date, last = opts[opts.length - 1].date;
+  $("window").innerHTML = `<h2>Wann startest du?</h2>
+    <p>Für die Auffuhr am <b>${dateWd(parseDate(s.beleg))}</b> musst du frühestens am <b>${dateWd(first)}</b>
+      und spätestens am <b>${dateWd(last)}</b> starten.<br>Erster Schritt: ${esc(firstTask.title)}.</p>
+    ${allPast ? '<p class="warn">Alle möglichen Starttermine liegen in der Vergangenheit. Bitte ein späteres Belegstellendatum wählen.</p>' : ""}
+    <div class="chips" role="radiogroup" aria-label="Starttermin">${opts.map((o, i) => `
+      <label class="chip"><input type="radio" name="startopt" value="${iso(o.date)}" ${iso(o.date) === sel ? "checked" : ""} ${o.past && !allPast ? "disabled" : ""}>
+        <span class="lbl">${i === 0 ? "frühestens" : i === opts.length - 1 ? "spätestens" : "&nbsp;"}</span>
+        <b>${WEEKDAYS[o.date.getDay()]}</b>${fmt(o.date)}
+      </label>`).join("")}
+    </div>`;
 }
 
 function renderTasks() {
-  const s = loadState(), today = new Date();
+  const s = loadState();
   $("tasks").innerHTML = schedule(s).map(t => {
     const wd = t.date.getDay(), weekend = wd === 0 || wd === 6;
     const cls = ["task", weekend && "weekend", t.isAnchor && "anchor", s.done[t.id] && "done"].filter(Boolean).join(" ");
@@ -262,7 +339,7 @@ function renderTasks() {
         <span class="day">Tag ${t.day > 0 ? "+" : ""}${t.day}</span>
       </div>
       <label class="title"><input type="checkbox" data-id="${t.id}" ${s.done[t.id] ? "checked" : ""}>
-        ${esc(t.title)} ${sameDay(t.date, today) ? '<span class="today-badge">heute</span>' : ""}</label>
+        ${esc(t.title)} ${sameDay(t.date, today()) ? '<span class="today-badge">heute</span>' : ""}</label>
       <div class="desc">${esc(t.desc)}</div>
     </li>`;
   }).join("");
@@ -288,7 +365,7 @@ function exportIcs() {
   });
   lines.push("END:VCALENDAR");
   const blob = new Blob([lines.join("\r\n")], { type: "text/calendar" });
-  const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: `${m.id}-${s.date}.ics` });
+  const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: `${m.id}-${iso(startDate(s))}.ics` });
   document.body.appendChild(a); a.click(); a.remove();
 }
 
@@ -298,20 +375,18 @@ $("modules").addEventListener("click", e => {
   if (!b || b.disabled) return;
   moduleId = b.dataset.id; store.set("modul", moduleId); renderAll();
 });
-$("date").addEventListener("change", e => {
-  if (!e.target.value) return;
-  const s = loadState(); s.date = e.target.value; saveState(s); renderTasks();
+$("beleg").addEventListener("change", e => {
+  const s = loadState(); s.beleg = e.target.value; s.start = ""; saveState(s); renderControls(); renderTasks();
+});
+$("start").addEventListener("change", e => {
+  const s = loadState(); s.start = e.target.value; saveState(s); renderWindow(); renderTasks();
+});
+$("window").addEventListener("change", e => {
+  if (e.target.name !== "startopt") return;
+  const s = loadState(); s.start = e.target.value; saveState(s); renderTasks();
 });
 $("method").addEventListener("change", e => {
-  const s = loadState();
-  // Umlarvtag beibehalten, falls der gewählte Bezugsschritt in der neuen Methode fehlt
-  const umlarvDatum = schedule(s).find(t => t.id === current().defaultAnchor).date;
-  s.method = e.target.value; s.done = {};
-  if (!currentMethod(s).tasks.some(t => t.id === s.anchor)) { s.anchor = current().defaultAnchor; s.date = iso(umlarvDatum); }
-  saveState(s); renderControls(); renderTasks();
-});
-$("anchor").addEventListener("change", e => {
-  const s = loadState(); s.anchor = e.target.value; saveState(s); renderTasks();
+  const s = loadState(); s.method = e.target.value; s.done = {}; saveState(s); renderControls(); renderTasks();
 });
 $("tasks").addEventListener("change", e => {
   if (!e.target.matches("input[type=checkbox]")) return;
